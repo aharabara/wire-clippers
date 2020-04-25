@@ -1,6 +1,10 @@
 {
     "require": {
-        "nette/php-generator": "^3.3"
+        "nette/php-generator": "^3.3",
+        "phpunit/phpunit": "^9.1"
+    },
+    "autoload-dev": {
+        "classmap": ["tests/"]
     },
     "autoload": {
         "psr-4": {
