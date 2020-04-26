@@ -2,7 +2,7 @@
 
 
 use PHPUnit\Framework\TestCase;
-use WireClipper\Parser;
+use WireClippers\Parser;
 
 class ParserTest extends TestCase
 {
@@ -12,7 +12,7 @@ class ParserTest extends TestCase
         return [
             ['.user', ['User' => []]],
             [
-                '.user[email:string, name:string, age:int]',
+                '.user[email:string,name:string,age:int]',
                 ['User' => ['email' => 'string', 'name' => 'string', 'age' => 'int']]
             ],
             [

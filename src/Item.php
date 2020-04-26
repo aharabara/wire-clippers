@@ -1,6 +1,6 @@
 <?php
 
-namespace WireClipper;
+namespace WireClippers;
 
 use Nette\PhpGenerator\ClassType;
 

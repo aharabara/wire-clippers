@@ -1,12 +1,13 @@
 <?php
 
-namespace WireClipper;
+namespace WireClippers;
 
 
 use ArrayObject;
 use BadMethodCallException;
 use InvalidArgumentException;
 use Nette\PhpGenerator\ClassType;
+use Nette\PhpGenerator\Parameter;
 
 class Parser
 {
@@ -33,7 +34,12 @@ class Parser
         $this->parse($code, $classes);
     }
 
-    protected function parse(string $code, ArrayObject $classes)
+    /**
+     * @param string $code
+     * @param ArrayObject|ClassType[] $classes
+     * @return Item|null
+     */
+    protected function parse(string $code, ArrayObject $classes): ?Item
     {
         print "->$code\n";
         if (empty($code)) {
@@ -49,6 +55,7 @@ class Parser
                 case self::CLASS_CONTEXT :
                     // new class context
                     $alias = $this->getToken($symbols);
+                    /**fixme add alias normalization for cases like "user-collection" and "user_collection"*/
                     if (isset($classes[$alias])) {
                         $context = new Item($alias, $classes[$alias]);
                     } else {
@@ -70,16 +77,48 @@ class Parser
 //                debug(" - - new interface $alias");
                     break;
                 case self::CONTEXT_EXTENDS :
+                    /** @fixme cannot resolve replacements like ".user">"User". Add some shit like searchClass, searchInterface and searchByAlias */
                     // context extends class/interface
                     $alias = $this->getToken($symbols);
                     $extendName = $this->toPascalCase($alias);
-                    if (isset($classes[$alias])) {
-                        $extendName = $classes[$alias]->getName();
+                    $classType = $context->getClass();
+                    $type = $classes[$alias] ?? null;
+                    if (!$type) {
+                        foreach ($classes as $class) {
+                            if ($class->getName() === $extendName) {
+                                $type = $class;
+                                break;
+                            }
+                        }
+                    }
+                    if ($type) {
+                        if ($type->isInterface()) {
+                            $classType->addImplement($type->getName());
+                        } else {
+                            $classType->addExtend($type->getName());
+                            if ($classType->hasMethod(self::CONSTRUCT_METHOD)) {
+                                $method = $classType->getMethod(self::CONSTRUCT_METHOD);
+                                $parameters = $method->getParameters();
+                                $parentParamsStr = '';
+                                if ($type->hasMethod(self::CONSTRUCT_METHOD)) {
+                                    $parentParams = $type->getMethod(self::CONSTRUCT_METHOD)->getParameters();
+                                    $parameters = array_merge($parentParams, $parameters);
+                                    $parentParamsStr = implode(',', array_map(static function (Parameter $parameter) {
+                                        return "\${$parameter->getName()}";
+                                    }, $parentParams));
+                                }
+                                $method
+                                    ->setParameters(array_merge($parameters))
+                                    ->addBody(sprintf('parent::%s(%s);', self::CONSTRUCT_METHOD, $parentParamsStr));
+                                /** add parent class params first + add them to parent call*/
+                            }
+                        }
+                        break;
                     }
                     if (interface_exists($extendName)) {
-                        $context->getClass()->addImplement($extendName);
-                    } elseif (isset($classes[$alias]) || class_exists($extendName)) {
-                        $context->getClass()->addExtend($extendName);
+                        $classType->addImplement($extendName);
+                    } elseif (class_exists($extendName)) {
+                        $classType->addExtend($extendName);
                     } else {
                         throw new InvalidArgumentException("There is no class/interface named '$extendName'");
                     }
@@ -108,8 +147,8 @@ class Parser
 
                             $class
                                 ->addProperty($member)
-                                ->setPrivate()
-                                ->setType($type);
+                                ->setPrivate();
+//                                ->setType($type); @fixme add as a 7.4 flag --property-types
 
                             $class
                                 ->addMethod($this->toCamelCase($member))
@@ -149,7 +188,7 @@ class Parser
          * it so it capitalizes the first letter in all words separated by a space then it
          * turns and deletes all spaces.
          */
-        return ucfirst(str_replace(['_','-'], '', ucwords($string, '_-')));
+        return ucfirst(str_replace(['_', '-'], '', ucwords($string, '_-')));
     }
 
     /**
@@ -193,10 +232,8 @@ class Parser
 
     private function validate(string $code): void
     {
-        $squareBrackets = ['[', ']'];
-        $roundBrackets = ['(', ')',];
-        $figureBrackets = ['{', '}'];
-        foreach ([$roundBrackets, $squareBrackets, $figureBrackets] as [$open, $close]) {
+        $bracketPairs = [['(', ')',], ['[', ']'], ['{', '}']];
+        foreach ($bracketPairs as [$open, $close]) {
             if (substr_count($code, $open) === substr_count($code, $close)) {
                 continue;
             }
