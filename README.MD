@@ -24,4 +24,9 @@
 ```
 .user[name:string, email:(.email[address:string]), password:(.password[value:string])]
 
+usage
+.<class-name>[...<property-name>:<type>]
+#<interface-name>[...<method-name]
+.class-name[<property-name>:(.<class-name>)]
+
 ```

@@ -2,6 +2,11 @@
 
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Printer;
+use WireClippers\BuilderModule\AutoCompleteHandler;
+use WireClippers\Collection\ClassCollection;
+use WireClippers\Collection\ClassesCollection;
+use WireClippers\Context;
+use WireClippers\Parser;
 
 require 'vendor/autoload.php';
 
@@ -12,52 +17,34 @@ print "`.`            - new class\n" .
     "GoodLuck!\n" .
     "===================\n";
 
-$context = new ArrayObject();
-$parser = new \WireClippers\Parser();
+$parser = new Parser();
 
-readline_completion_function(function ($_input, $start, $end) use ($context) {
-    $defaultTypes = ['string', 'int', 'bool', 'float', \ArrayObject::class];
-    $input = readline_info('line_buffer');
-    /* @todo add basic types like int, string and etc, */
-    /* @todo add command autocomplete (this handler is only for build and preview commands) */
-    $lastSymbol = substr($input, strlen($input) - 1, 1);
-    $primary = $aliases = array_keys($context->getArrayCopy());
-    $secondary = $classes = array_map(static function (ClassType $type) {
-        return $type->getName();
-    }, $context->getArrayCopy());
-    if ($lastSymbol === ':') {
-        $format = "{$input}%s";
-        $primary = array_merge($defaultTypes, $classes);
-    } elseif ($lastSymbol === '(') {
-        $format = "{$input}.%s)";
-    } elseif ('.' === $lastSymbol) {
-        $format = "{$input}%s";
-        $primary = $aliases;
-    } elseif ('>' === $lastSymbol) {
-        $format = "{$input}%s";
-        $primary = $aliases;
-    } elseif (in_array($lastSymbol, ['[', ','])) {
-        $format = "{$input}%s:%s";
-    } else {
-        $format = "$input.%s";
-    }
-    return array_map(static function (?string $first = null, ?string $second = null) use ($format) {
-        return sprintf($format, $first, $second);
-    }, $primary, $secondary);
-});
+$context = new Context(new ClassesCollection(), new ClassCollection());
+readline_completion_function(new AutoCompleteHandler($context));
 
 
 while ($line = readline('wrc>>')) {
     if (empty($line)) {
         break;
     }
-    $parser->run($line . "\n", $context);
+    try {
+        $parser->run($line . "\n", $context);
+    } catch (Throwable $e) {
+        $output = "Error : {$e->getMessage()}\n";
+        if (Parser::DEBUG) {
+            $output .= "{$e->getFile()}:{$e->getLine()}\n";
+        }
+        print $output;
+    }
 }
 
 $printer = new Printer();
 $output = '';
-foreach ($context as $class) {
-    $output .= $printer->printClass($class);
+foreach ($context->interfaces() as $interfaces) {
+    $output .= $printer->printClass($interfaces->getClassType());
+}
+foreach ($context->classes() as $class) {
+    $output .= $printer->printClass($class->getClassType());
 }
 file_put_contents('./domain.php', "<?php\n\n" . $output);
 

@@ -3,168 +3,160 @@
 namespace WireClippers;
 
 
-use ArrayObject;
 use BadMethodCallException;
-use InvalidArgumentException;
-use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\Parameter;
+use LogicException;
+use WireClippers\BuilderModule\ClassInterface;
+use WireClippers\EntityModule\Command;
+use WireClippers\EntityModule\Handler\CollectionHandler;
+use WireClippers\EntityModule\Handler\DtoHandler;
+use WireClippers\EntityModule\Handler\EntityHandler;
+use WireClippers\EntityModule\Handler\EnumHandler;
+use WireClippers\EntityModule\Handler\InterfaceHandler;
 
 class Parser
 {
 
     const DEBUG = true;
-    const CONSTRUCT_METHOD = '__construct';
 
     const CLASS_CONTEXT = '.';
     const MEMBER_CONEXT_START = '[';
     const MEMBER_CONTEXT_END = ']';
-    const SUB_CONTEXT_START = '(';
-    const SUB_CONTEXT_END = ')';
     const INTERFACE_CONTEXT = '#';
     const CONTEXT_EXTENDS = '>';
     const CONTEXT_END = "\n";
     const OPERATIONS = [
         self::CLASS_CONTEXT, self::MEMBER_CONEXT_START, self::MEMBER_CONTEXT_END, self::INTERFACE_CONTEXT, self::CONTEXT_EXTENDS, self::CONTEXT_END
     ];
+    const PROPERTY_TYPES = 'settings.property-types';
 
-    public function run(string $code, ArrayObject $classes)
+    /** @var bool[] */
+    private $settings;
+
+    /** @var CaseConverter */
+    private $snakeToPascalCaseConverter;
+    private $handlers;
+
+    public function __construct(array $settings = [])
+    {
+        $this->settings = $settings;
+        $this->handlers = [
+            DtoHandler::getName() => new DtoHandler(),
+            EntityHandler::getName() => new EntityHandler(),
+            InterfaceHandler::getName() => new InterfaceHandler(),
+            CollectionHandler::getName() => new CollectionHandler(),
+            EnumHandler::getName() => new EnumHandler(),
+        ];
+        $this->snakeToPascalCaseConverter = new CaseConverter();
+    }
+
+    public function run(string $code, Context $context)
     {
         $code = str_replace(' ', '', $code);
         $this->validate($code);
-        $this->parse($code, $classes);
+        $this->parse($code, $context);
     }
 
     /**
      * @param string $code
-     * @param ArrayObject|ClassType[] $classes
-     * @return Item|null
+     * @param Context $context
+     * @return string
      */
-    protected function parse(string $code, ArrayObject $classes): ?Item
+    protected function parse(string $code, Context $context): ?string
     {
+        /** @var Entity|ClassInterface|null $current */
+        $current = null;
+        $settings = $this->settings;
+
+        preg_match_all('/(?<name>.+)@(?<command>.+)(?:\[)(?<members>.+)?(?:\])/', $code, $matches, PREG_SET_ORDER, 0);
+        $matches = array_shift($matches);
+        $name = $matches['name'] ?? null;
+        $command = $matches['command'] ?? null;
+        $members = $matches['members'] ?? [];
+
+        if (!empty($members)) {
+            preg_match_all('/(.+?)(?:,|$)/m', $members, $members, PREG_SET_ORDER, 0);
+            $members = array_map('trim', array_column($members, 1));
+        }
+        $handler = $this->getCommandHanlerByCommandName($command);
+        if (!$handler) {
+            throw new LogicException("There is no command handler '$command'. You can create one using '<name>@wrc-command'");
+        }
+        $handler->handle(new Command($name, $members), $context);
+        return null;
+
+        /** @fixme add common class settings. ex: users@collection -> UserCollection>IlluminateCollection, or Users>ArrayCollection, */
+        /** @fixme add settings for --property-type, --return-type, --short-getters, --setters */
+        /** @fixme add assemble/disassemble commands that will collect all namespace classes will allow to transform them */
+
         print "->$code\n";
         if (empty($code)) {
             return null;
         }
-        $code = $this->preparse($code, $classes);
+        // @fixme I am getting rid of preparse, because in the context of readline we don't need recursive parsing.
+        // @fixme we will keep it "proceduralish" way
+//        $code = $this->preparse($code, $context);
         print "<-$code\n\n";
 //    debug(" - PARSE: $code");
-        $context = null;
         $symbols = str_split($code);
         while (!empty($symbols)) {
             switch ($symbol = array_shift($symbols)) {
-                case self::CLASS_CONTEXT :
-                    // new class context
-                    $alias = $this->getToken($symbols);
-                    /**fixme add alias normalization for cases like "user-collection" and "user_collection"*/
-                    if (isset($classes[$alias])) {
-                        $context = new Item($alias, $classes[$alias]);
-                    } else {
-                        $context = new Item($alias, new ClassType($this->toPascalCase($alias)));
-                    }
-//                debug(" - - new class $alias");
-                    break;
                 case self::INTERFACE_CONTEXT :
                     // new class context
                     $alias = $this->getToken($symbols);
-                    if (isset($classes[$alias])) {
-                        $context = new Item($alias, $classes[$alias]);
+                    if ($classes->hasAlias($alias)) {
+                        $current = $classes[$alias];
                     } else {
-                        $context = new Item(
-                            $alias,
-                            (new ClassType($this->toPascalCase($alias) . 'Interface'))->setInterface()
-                        );
+                        $current = $classes[$alias] = new ClassInterface($this->snakeToPascalCaseConverter->pascalize($alias) . 'Interface');
                     }
-//                debug(" - - new interface $alias");
                     break;
+                /*@fixme !!! replace `>` with ':', so we will have .user_collection:\ArrayObject */
+                /*@fixme !!! Add custom class handlers (like entity or class-interface), so I could create collections/controlles and mappers
+                    + user@entity[...methods] (supply signatures later as prompts?)
+                    + user@dto[from:User]
+                    + user@interface[...methods] (supply signatures later as prompts?)
+                    + users@collection[type:User]
+                    + users@enum[value1, value2, value3]
+                    - user@transfromer[from:User, to:UserDTO]
+                    - creat_user@cqrs-command[...fields]
+                    - find_user@cqrs-query[...fields]
+                    - user@cqrs-handler[for:<Command/Query>]
+
+                add postprocessors and implement a pipeline with these processors. fo example NamespaceDisassembleProcessor
+
+                    @todo <name>@<handler>[parameters with autocomplete]
+                    name@<command-autocomplete-handler>[command-parameter-autocomplete-handler
+                 */
+                /*@fixme !!! Remove extend by alias */
                 case self::CONTEXT_EXTENDS :
-                    /** @fixme cannot resolve replacements like ".user">"User". Add some shit like searchClass, searchInterface and searchByAlias */
                     // context extends class/interface
                     $alias = $this->getToken($symbols);
-                    $extendName = $this->toPascalCase($alias);
-                    $classType = $context->getClass();
-                    $type = $classes[$alias] ?? null;
-                    if (!$type) {
-                        foreach ($classes as $class) {
-                            if ($class->getName() === $extendName) {
-                                $type = $class;
-                                break;
-                            }
-                        }
+                    $extendName = $this->snakeToPascalCaseConverter->pascalize($alias);
+
+                    if ($current === null) {
+                        throw new LogicException('Nothing to extend.');
                     }
-                    if ($type) {
-                        if ($type->isInterface()) {
-                            $classType->addImplement($type->getName());
-                        } else {
-                            $classType->addExtend($type->getName());
-                            if ($classType->hasMethod(self::CONSTRUCT_METHOD)) {
-                                $method = $classType->getMethod(self::CONSTRUCT_METHOD);
-                                $parameters = $method->getParameters();
-                                $parentParamsStr = '';
-                                if ($type->hasMethod(self::CONSTRUCT_METHOD)) {
-                                    $parentParams = $type->getMethod(self::CONSTRUCT_METHOD)->getParameters();
-                                    $parameters = array_merge($parentParams, $parameters);
-                                    $parentParamsStr = implode(',', array_map(static function (Parameter $parameter) {
-                                        return "\${$parameter->getName()}";
-                                    }, $parentParams));
-                                }
-                                $method
-                                    ->setParameters(array_merge($parameters))
-                                    ->addBody(sprintf('parent::%s(%s);', self::CONSTRUCT_METHOD, $parentParamsStr));
-                                /** add parent class params first + add them to parent call*/
-                            }
-                        }
-                        break;
-                    }
-                    if (interface_exists($extendName)) {
-                        $classType->addImplement($extendName);
-                    } elseif (class_exists($extendName)) {
-                        $classType->addExtend($extendName);
+
+                    if (interface_exists($extendName) || class_exists($extendName)) {
+                        $current->extendsClass($extendName);
                     } else {
-                        throw new InvalidArgumentException("There is no class/interface named '$extendName'");
+                        $class = $interfaces->getByAlias($alias) ?? $interfaces->getByAlias($extendName);
+                        if (null === $class) {
+                            throw new LogicException(sprintf("'%s' does not exist.", $extendName));
+                        }
+                        $current->extendsClass($class->name());
                     }
                     break;
                 case self::MEMBER_CONEXT_START :
                     // start context member adding (field or method)
                     $members = $this->getToken($symbols);
-                    foreach (explode(',', $members) as $member) {
-                        [$member, $type] = array_pad(explode(':', $member), 2, null);
-                        $member = $this->toCamelCase(trim($member));
-                        $class = $context->getClass();
-                        if ($class->isInterface()) {
-                            $class
-                                ->addMethod($member)
-                                ->setPublic()
-                                ->setReturnType($type);
-                        } else /*is class */ {
-                            if (!$class->hasMethod(self::CONSTRUCT_METHOD)) {
-                                $class->addMethod(self::CONSTRUCT_METHOD);
-                            }
-                            $constructor = $class->getMethod(self::CONSTRUCT_METHOD);
-                            $constructor
-                                ->addBody("\$this->{$member} = \${$member};")
-                                ->addParameter($member)
-                                ->setType($type);
 
-                            $class
-                                ->addProperty($member)
-                                ->setPrivate();
-//                                ->setType($type); @fixme add as a 7.4 flag --property-types
-
-                            $class
-                                ->addMethod($this->toCamelCase($member))
-                                ->setBody("return \$this->$member;")
-                                ->setReturnType($type);
-                        }
-                    }
                     break;
                 case self::MEMBER_CONTEXT_END :
                     // end context member adding (field or method)
                     break;
             }
         }
-//    debug("PARSED: $code");
-        $classes[$context->getAlias()] = $context->getClass();
-        return $context;
+        return $current->name();
     }
 
     /**
@@ -181,22 +173,13 @@ class Parser
         return $className;
     }
 
-    function toPascalCase(string $string, array $dontStrip = [])
-    {
-        /*
-         * This will take any dash or underscore turn it into a space, run ucwords against
-         * it so it capitalizes the first letter in all words separated by a space then it
-         * turns and deletes all spaces.
-         */
-        return ucfirst(str_replace(['_', '-'], '', ucwords($string, '_-')));
-    }
 
     /**
      * @param string $code
-     * @param ArrayObject $context
+     * @param Context $context
      * @return mixed
      */
-    function preparse(string $code, ArrayObject $context)
+    function preparse(string $code, Context $context)
     {
         $from = $code;
 //    debug("PREPARSE: $code");
@@ -210,8 +193,8 @@ class Parser
             if (empty($line)) {
                 break;
             }
-            $item = $this->parse($line, $context);
-            $code = str_replace("($line)", $item->getClass()->getName(), $code);
+            $className = $this->parse($line, $context);
+            $code = str_replace("($line)", $className, $code);
         } while (!empty($matches));
 //        if (strpos($line, '(') !== FALSE) {
 //            $subcode = preparse($line, $context);
@@ -233,6 +216,7 @@ class Parser
     private function validate(string $code): void
     {
         $bracketPairs = [['(', ')',], ['[', ']'], ['{', '}']];
+        $code = trim($code, " \n");
         foreach ($bracketPairs as [$open, $close]) {
             if (substr_count($code, $open) === substr_count($code, $close)) {
                 continue;
@@ -245,12 +229,10 @@ class Parser
         }
     }
 
-    /**
-     * @param string $string
-     * @return string
-     */
-    private function toCamelCase(string $string): string
+    private function getCommandHanlerByCommandName($command)
     {
-        return lcfirst($this->toPascalCase($string));
+        return $this->handlers[$command] ?? null;
     }
+
+
 }

@@ -2,55 +2,42 @@
 
 namespace WireClippers;
 
-use WireClippers\Collection\ClassTypeCollection;
+use WireClippers\BuilderModule\ClassInterface;
+use WireClippers\BuilderModule\Entity;
+use WireClippers\Collection\ClassCollection;
+use WireClippers\Collection\ClassesCollection;
 
 class Context
 {
-    private ClassTypeCollection $classes;
-    private ClassTypeCollection $interfaces;
-    private ?Item $current;
+    /** @var ClassesCollection */
+    private $classes;
+    /** @var ClassCollection */
+    private $interfaces;
 
     /**
      * Context constructor.
-     * @param ClassTypeCollection $classes
-     * @param ClassTypeCollection $interfaces
+     * @param ClassesCollection $classes
+     * @param ClassCollection $interfaces
      */
-    public function __construct(ClassTypeCollection $classes, ClassTypeCollection $interfaces)
+    public function __construct(ClassesCollection $classes, ClassCollection $interfaces)
     {
         $this->classes = $classes;
         $this->interfaces = $interfaces;
-        $this->current = null;
     }
 
     /**
-     * @return ClassTypeCollection
+     * @return ClassesCollection|Entity[]
      */
-    public function classes(): ClassTypeCollection
+    public function classes(): ClassesCollection
     {
         return $this->classes;
     }
 
     /**
-     * @return ClassTypeCollection
+     * @return ClassCollection
      */
-    public function interfaces(): ClassTypeCollection
+    public function interfaces(): ClassCollection
     {
         return $this->interfaces;
-    }
-
-    /**
-     * @return Item
-     */
-    public function current(): Item
-    {
-        return $this->current;
-    }
-
-    /**
-     * @param Item $item
-     */
-    public function setCurrent(Item $item): void
-    {
-        $this->current = $item;
     }
 }
