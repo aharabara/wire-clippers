@@ -2,42 +2,27 @@
 
 namespace WireClippers;
 
-use WireClippers\BuilderModule\ClassInterface;
-use WireClippers\BuilderModule\Entity;
-use WireClippers\Collection\ClassCollection;
-use WireClippers\Collection\ClassesCollection;
+use WireClippers\EntityModule\Collection\ClassCollection;
 
 class Context
 {
-    /** @var ClassesCollection */
-    private $classes;
     /** @var ClassCollection */
-    private $interfaces;
+    private $classes;
 
     /**
      * Context constructor.
-     * @param ClassesCollection $classes
-     * @param ClassCollection $interfaces
+     * @param ClassCollection $classes
      */
-    public function __construct(ClassesCollection $classes, ClassCollection $interfaces)
+    public function __construct(ClassCollection $classes)
     {
         $this->classes = $classes;
-        $this->interfaces = $interfaces;
-    }
-
-    /**
-     * @return ClassesCollection|Entity[]
-     */
-    public function classes(): ClassesCollection
-    {
-        return $this->classes;
     }
 
     /**
      * @return ClassCollection
      */
-    public function interfaces(): ClassCollection
+    public function classes(): ClassCollection
     {
-        return $this->interfaces;
+        return $this->classes;
     }
 }

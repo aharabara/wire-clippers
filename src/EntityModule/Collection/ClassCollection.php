@@ -1,8 +1,8 @@
 <?php
 
-namespace WireClippers\Collection;
+namespace WireClippers\EntityModule\Collection;
 
-use WireClippers\BuilderModule\ClassInterface;
+use WireClippers\EntityModule\ClassInterface;
 
 class ClassCollection extends \ArrayObject
 {

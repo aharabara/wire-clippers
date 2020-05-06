@@ -2,9 +2,8 @@
 
 
 use PHPUnit\Framework\TestCase;
-use WireClippers\Collection\ClassCollection;
-use WireClippers\Collection\ClassesCollection;
 use WireClippers\Context;
+use WireClippers\EntityModule\Collection\ClassCollection;
 use WireClippers\Parser;
 
 class EntityHandlerTest extends TestCase
@@ -35,7 +34,7 @@ class EntityHandlerTest extends TestCase
     public function testBasicClass(string $code, array $expected)
     {
         /** @var \Nette\PhpGenerator\ClassType[]|ArrayObject $classes */
-        $context = new Context(new ClassesCollection(), new ClassCollection());
+        $context = new Context(new ClassCollection());
         (new Parser([Parser::PROPERTY_TYPES]))->run($code, $context);
         foreach ($context->classes() as $alias => $entity) {
             $className = $entity->name();

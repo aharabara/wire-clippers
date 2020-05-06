@@ -120,6 +120,8 @@ class Parser
                     - creat_user@cqrs-command[...fields]
                     - find_user@cqrs-query[...fields]
                     - user@cqrs-handler[for:<Command/Query>]
+                    - encoder@chaining[json:JsonEncoder, yaml:YamlEncoder, xml:XmlEncoder]
+                    - encryptor@chaining[md5:Md5Encrypter, sha256:Sha256Encrypter, xml:XmlEncoder]
 
                 add postprocessors and implement a pipeline with these processors. fo example NamespaceDisassembleProcessor
 

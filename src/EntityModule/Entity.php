@@ -3,11 +3,7 @@
 
 namespace WireClippers\EntityModule;
 
-
-use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\Parameter;
 use Nette\PhpGenerator\Property;
-use WireClippers\BuilderModule\ClassInterface;
 use WireClippers\EntityModule\Entity\Field;
 
 class Entity extends ClassInterface

@@ -2,9 +2,9 @@
 
 
 use PHPUnit\Framework\TestCase;
-use WireClippers\Collection\ClassCollection;
-use WireClippers\Collection\ClassesCollection;
 use WireClippers\Context;
+use WireClippers\EntityModule\Collection\ClassCollection;
+use WireClippers\EntityModule\DTO;
 use WireClippers\Parser;
 
 class DtoHandlerTest extends TestCase
@@ -40,10 +40,10 @@ class DtoHandlerTest extends TestCase
      */
     public function testDtoHandler(string $name, string $entity, string $dto, array $fields)
     {
-        $context = new Context(new ClassesCollection(), new ClassCollection());
+        $context = new Context(new ClassCollection());
         $this->parser->run($entity, $context);
         $this->parser->run($dto, $context);
-        /** @var \WireClippers\EntityModule\DTO $dto */
+        /** @var DTO $dto */
         $dto = $context->classes()->getByAlias($name);
         $dtoFields = [];
         foreach ($dto->fields() as $field) {

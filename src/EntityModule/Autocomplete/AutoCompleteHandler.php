@@ -1,6 +1,6 @@
 <?php
 
-namespace WireClippers\BuilderModule;
+namespace WireClippers\EntityModule\Autocomplete;
 
 use ArrayObject;
 use Nette\PhpGenerator\ClassType;

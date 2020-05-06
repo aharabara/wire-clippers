@@ -21,7 +21,7 @@ class InterfaceHandler
     }
 
     public function handle(Command $command, Context $context){
-        $classes = $context->interfaces();
+        $classes = $context->classes();
         $alias = $command->getName().'-interface';
         $current = $classes->getByAlias($alias) ?? $classes->getByName($alias);
         if (!$current) {

@@ -1,6 +1,6 @@
 <?php
 
-namespace WireClippers\BuilderModule;
+namespace WireClippers\EntityModule;
 
 use Nette\PhpGenerator\ClassType;
 use WireClippers\EntityModule\Entity\Method;

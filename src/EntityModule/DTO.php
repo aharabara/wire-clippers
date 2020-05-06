@@ -4,7 +4,6 @@
 namespace WireClippers\EntityModule;
 
 use Nette\PhpGenerator\Property;
-use WireClippers\BuilderModule\ClassInterface;
 use WireClippers\EntityModule\Entity\Field;
 use WireClippers\EntityModule\Entity\Method;
 

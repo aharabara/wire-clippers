@@ -1,10 +1,8 @@
 <?php
 
-use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Printer;
 use WireClippers\BuilderModule\AutoCompleteHandler;
 use WireClippers\Collection\ClassCollection;
-use WireClippers\Collection\ClassesCollection;
 use WireClippers\Context;
 use WireClippers\Parser;
 
@@ -19,7 +17,7 @@ print "`.`            - new class\n" .
 
 $parser = new Parser();
 
-$context = new Context(new ClassesCollection(), new ClassCollection());
+$context = new Context(new ClassCollection());
 readline_completion_function(new AutoCompleteHandler($context));
 
 
@@ -40,9 +38,6 @@ while ($line = readline('wrc>>')) {
 
 $printer = new Printer();
 $output = '';
-foreach ($context->interfaces() as $interfaces) {
-    $output .= $printer->printClass($interfaces->getClassType());
-}
 foreach ($context->classes() as $class) {
     $output .= $printer->printClass($class->getClassType());
 }
